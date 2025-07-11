@@ -5,19 +5,72 @@ import (
 	"net/http"
 	"otel-test/env"
 	"otel-test/http/middleware"
+	"otel-test/server/service"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
-func Run(ctx context.Context, mode env.Mode) error {
+type Server interface {
+	Start(ctx context.Context) error
+	Shutdown(ctx context.Context) error
+}
 
-	// set up handler
-	// モードによってハンドラーの設定を変える
-	mh := NewHandler(mode)
+// HTTPServer はHTTPサーバーの実装（依存性注入対応版）
+type HTTPServer struct {
+	server      *http.Server
+	mode        env.Mode
+	userService *service.UserService // 追加: UserServiceの依存性
+	tracer      trace.Tracer         // 追加: カスタムトレーサー
+}
+
+// Dependencies はサーバーが必要とする依存性をまとめた構造体
+type Dependencies struct {
+	UserService *service.UserService
+	// 将来的に他のサービスも追加可能
+	// OrderService *service.OrderService
+	// PaymentService *service.PaymentService
+}
+
+// NewServer は新しいサーバーインスタンスを作成します（依存性注入対応）
+func NewServer(mode env.Mode, deps *Dependencies) Server {
+	return &HTTPServer{
+		mode:        mode,
+		userService: deps.UserService,
+		tracer:      otel.Tracer("http-server"),
+	}
+}
+
+func (s *HTTPServer) Start(ctx context.Context) error {
+	// ハンドラーの設定
+	mh := newHandler(s.mode)
 	mh.handleHTTP("/single", handlerSingle())
 	mh.handleHTTP("/multi", handlerMulti())
 
-	return http.ListenAndServe(":8080", mh.mux)
+	mh.handleHTTP("/users", s.handleUsers())
+	mh.handleHTTP("/users/{id}", s.handleUserByID())
+	mh.handleHTTP("/health", s.handleHealth())
+
+	// HTTPサーバーの作成
+	s.server = &http.Server{
+		Addr:    ":8080",
+		Handler: mh.mux,
+	}
+
+	// サーバーの起動
+	if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		return err
+	}
+
+	return nil
+}
+
+func (s *HTTPServer) Shutdown(ctx context.Context) error {
+	if s.server == nil {
+		return nil
+	}
+	return s.server.Shutdown(ctx)
 }
 
 type MyHandler struct {
@@ -25,7 +78,7 @@ type MyHandler struct {
 	wrapHandler func(http.HandlerFunc, string) http.Handler
 }
 
-func NewHandler(mode env.Mode) *MyHandler {
+func newHandler(mode env.Mode) *MyHandler {
 	var wrapper func(http.HandlerFunc, string) http.Handler
 	switch mode {
 	case env.GCPOtel:
