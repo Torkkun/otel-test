@@ -28,17 +28,9 @@ func main() {
 		slog.ErrorContext(ctx, "error setting up OpenTelemetry", slog.Any("error", err))
 		os.Exit(1)
 	}
-	// CloudSQL設定
-	dbConfig := database.CloudSQLConfig{
-		Host:     os.Getenv("DB_HOST"),
-		Port:     5432,
-		User:     os.Getenv("DB_USER"),
-		Password: os.Getenv("DB_PASSWORD"),
-		DBName:   os.Getenv("DB_NAME"),
-		SSLMode:  "require",
-	}
+
 	// データベース接続
-	db, err := database.NewCloudSQLDB(dbConfig)
+	db, err := database.NewCloudSQLDB()
 	if err != nil {
 		slog.ErrorContext(ctx, "failed to connect to database", slog.Any("error", err))
 		os.Exit(1)

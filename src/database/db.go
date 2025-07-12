@@ -28,7 +28,16 @@ type CloudSQLConfig struct {
 	SSLMode  string
 }
 
-func NewCloudSQLDB(config CloudSQLConfig) (*DB, error) {
+func NewCloudSQLDB() (*DB, error) {
+	// CloudSQL設定
+	config := CloudSQLConfig{
+		Host:     os.Getenv("DB_HOST"),
+		Port:     5432,
+		User:     os.Getenv("DB_USER"),
+		Password: os.Getenv("DB_PASSWORD"),
+		DBName:   os.Getenv("DB_NAME"),
+		SSLMode:  "require",
+	}
 	// CloudSQL接続文字列を構築
 	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
 		config.Host, config.Port, config.User, config.Password, config.DBName, config.SSLMode)

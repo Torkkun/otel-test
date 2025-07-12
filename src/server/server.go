@@ -28,9 +28,6 @@ type HTTPServer struct {
 // Dependencies はサーバーが必要とする依存性をまとめた構造体
 type Dependencies struct {
 	UserService *service.UserService
-	// 将来的に他のサービスも追加可能
-	// OrderService *service.OrderService
-	// PaymentService *service.PaymentService
 }
 
 // NewServer は新しいサーバーインスタンスを作成します（依存性注入対応）
